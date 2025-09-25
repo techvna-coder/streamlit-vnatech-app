@@ -1,0 +1,7 @@
+streamlit
+openai
+tiktoken
+numpy
+pandas
+pypdf
+python-pptx
