@@ -6,6 +6,11 @@ import os
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 st.set_page_config(page_title="VNA TECH SUPPORT", page_icon="📚", layout="wide")
 st.title("📚 VNA TECH SUPPORT Q&A")
+st.markdown("""
+### 🔎 Giới thiệu
+Công cụ **VNA Tech** giúp kỹ sư nhanh chóng tra cứu thông tin từ **tài liệu kỹ thuật, PDF, slide đào tạo**.
+Chỉ cần tải tài liệu, đặt câu hỏi → hệ thống tự động tìm và trả lời dựa trên nội dung.
+""")
 
 uploaded = st.file_uploader("Tải file PDF/PPTX", type=["pdf","pptx"], accept_multiple_files=True)
 query = st.text_input("Đặt câu hỏi:")
