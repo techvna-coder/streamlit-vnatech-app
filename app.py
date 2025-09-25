@@ -4,8 +4,8 @@ from openai import OpenAI
 import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-st.set_page_config(page_title="RAG PDF/PPTX", page_icon="📚", layout="wide")
-st.title("📚 RAG App: PDF/PPTX Q&A")
+st.set_page_config(page_title="VNA TECH SUPPORT", page_icon="📚", layout="wide")
+st.title("📚 VNA TECH SUPPORT Q&A")
 
 uploaded = st.file_uploader("Tải file PDF/PPTX", type=["pdf","pptx"], accept_multiple_files=True)
 query = st.text_input("Đặt câu hỏi:")
