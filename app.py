@@ -6,6 +6,12 @@ from openai import OpenAI
 from drive_utils import get_drive_from_service_account, list_files_in_folder, download_file
 from index_builder import (get_client, load_meta, save_meta, load_faiss, save_faiss,
                            add_document_to_index, md5_of_file, DIM, l2_normalize, embed_texts)
+import json
+
+creds_json = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
+creds_dict = json.loads(creds_json)
+
+
 st.set_page_config(page_title="VNA Tech – Tra cứu tài liệu", page_icon="✈️", layout="wide")
 st.title("✈️ VNA Tech: Hỗ trợ tra cứu thông tin tài liệu từ Google Drive")
 
