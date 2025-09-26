@@ -5,3 +5,5 @@ numpy
 pandas
 pypdf
 python-pptx
+pydrive2
+faiss-cpu
