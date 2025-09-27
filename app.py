@@ -3,6 +3,7 @@
 
 import os, io, json, hashlib, pickle, tempfile
 from typing import Dict, Any, List, Tuple
+from collections.abc import Mapping
 
 import numpy as np
 import streamlit as st
@@ -24,19 +25,29 @@ META_PATH = "embeddings_meta.pkl"        # cache chính (metadata + embeddings +
 
 # ===== Helpers: Secrets =====
 def load_gsa_secrets() -> Dict[str, Any]:
-    if "GOOGLE_SERVICE_ACCOUNT_JSON" not in st.secrets:
+    """Đọc GOOGLE_SERVICE_ACCOUNT_JSON dưới dạng Mapping (TOML object) hoặc string JSON."""
+    raw = st.secrets.get("GOOGLE_SERVICE_ACCOUNT_JSON", None)
+    if raw is None:
         st.error("Thiếu GOOGLE_SERVICE_ACCOUNT_JSON trong Secrets."); st.stop()
-    raw = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    if isinstance(raw, dict):
+
+    # ✓ Bảng TOML (Mapping) -> chuyển sang dict chuẩn
+    if isinstance(raw, Mapping):
         return dict(raw)
+
+    # ✓ String JSON (triple quotes)
     if isinstance(raw, str):
         try:
             return json.loads(raw)
         except Exception:
-            st.error("GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ (kiểm tra triple quotes và \\n trong private_key).")
+            st.error(
+                "GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ. "
+                "Kiểm tra triple quotes và giữ nguyên ký tự \\n trong private_key."
+            )
             st.stop()
-    st.error("GOOGLE_SERVICE_ACCOUNT_JSON phải là string JSON hoặc object."); st.stop()
 
+    # Trường hợp khác (khó gặp)
+    st.error(f"GOOGLE_SERVICE_ACCOUNT_JSON có kiểu không hỗ trợ: {type(raw).__name__}")
+    st.stop()
 def require_secret(key: str) -> str:
     v = st.secrets.get(key) or os.getenv(key)
     if not v:
