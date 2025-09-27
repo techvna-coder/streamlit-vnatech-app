@@ -1,3 +1,10 @@
 __pycache__/
 .venv/
-index.pkl
+embeddings_meta.pkl
+*.pyc
+.streamlit/
+__pycache__/
+.venv/
+embeddings_meta.pkl
+*.pyc
+.streamlit/
