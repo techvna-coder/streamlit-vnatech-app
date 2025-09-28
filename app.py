@@ -36,9 +36,9 @@ def require_secret(key: str) -> str:
 
 def load_gsa_secrets() -> Dict[str, Any]:
     """
-    Đọc GOOGLE_SERVICE_ACCOUNT_JSON dưới dạng:
-    - Mapping (TOML object) -> trả về dict
-    - String JSON (triple quotes '''...''' hoặc """...""") -> json.loads
+    Đọc GOOGLE_SERVICE_ACCOUNT_JSON:
+    - Nếu là Mapping (TOML object) -> trả về dict
+    - Nếu là chuỗi JSON (đặt trong triple quotes) -> dùng json.loads
     """
     raw = st.secrets.get("GOOGLE_SERVICE_ACCOUNT_JSON", None)
     if raw is None:
@@ -51,7 +51,10 @@ def load_gsa_secrets() -> Dict[str, Any]:
         try:
             return json.loads(raw)  # JSON string
         except Exception:
-            st.error("GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ. Kiểm tra triple quotes và giữ nguyên ký tự \\n trong private_key.")
+            st.error(
+                "GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ. "
+                "Kiểm tra triple quotes và giữ nguyên ký tự \\n trong private_key."
+            )
             st.stop()
 
     st.error(f"GOOGLE_SERVICE_ACCOUNT_JSON có kiểu không hỗ trợ: {type(raw).__name__}")
