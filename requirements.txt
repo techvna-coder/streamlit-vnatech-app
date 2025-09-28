@@ -3,7 +3,7 @@ openai
 tiktoken
 numpy
 pandas
-pypdf
+PyPDF2
 python-pptx
 pydrive2
 faiss-cpu
