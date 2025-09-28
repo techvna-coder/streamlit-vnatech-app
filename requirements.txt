@@ -5,5 +5,5 @@ numpy
 pandas
 PyPDF2
 python-pptx
-pydrive2
+pydrive2>=1.19.0
 faiss-cpu
