@@ -3,14 +3,11 @@ import io, json, os
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-def get_drive_from_service_account(json_str: str) -> GoogleDrive:
-    gauth = GoogleAuth(settings={
-        "client_config_backend": "service",
-        "service_config": {"client_json": json.loads(json_str)},
-        "save_credentials": False,
-    })
-    gauth.ServiceAuth()
-    return GoogleDrive(gauth)
+def get_drive(creds_dict):
+    gauth = GoogleAuth()
+    gauth.ServiceAuth(creds_dict)  # truyền dict trực tiếp
+    drive = GoogleDrive(gauth)
+    return drive
 
 def list_files_in_folder(drive: GoogleDrive, folder_id: str):
     # Chỉ lấy PDF, PPTX
