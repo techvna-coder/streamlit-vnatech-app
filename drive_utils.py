@@ -1,3 +1,4 @@
+# drive_utils.py
 from __future__ import annotations
 
 import json
@@ -9,25 +10,28 @@ from pydrive2.drive import GoogleDrive
 
 
 def _normalize_gsa(raw: Any) -> Dict[str, Any]:
-    """Chuẩn hoá GOOGLE_SERVICE_ACCOUNT_JSON về dict."""
+    """Chuẩn hoá GOOGLE_SERVICE_ACCOUNT_JSON về dict (hỗ trợ TOML object hoặc JSON string)."""
     if isinstance(raw, Mapping):
-        return dict(raw)             # TOML object
+        return dict(raw)             # TOML object -> dict
     if isinstance(raw, str):
-        return json.loads(raw)       # JSON string (chú ý private_key dùng \\n)
+        return json.loads(raw)       # JSON string -> dict
     raise TypeError(f"GOOGLE_SERVICE_ACCOUNT_JSON kiểu không hỗ trợ: {type(raw).__name__}")
 
 
 def get_drive_from_secrets(raw_gsa: Any) -> GoogleDrive:
-    """Tạo GoogleDrive client từ secrets (string JSON hoặc TOML object)."""
+    """
+    Tạo GoogleDrive client từ secrets.
+    Dùng ServiceAuth(keyfile_dict=...) + scopes để tránh mọi nhánh parse JSON nội bộ.
+    """
     client_json = _normalize_gsa(raw_gsa)
 
-    gauth = GoogleAuth(settings={
-        "client_config_backend": "service",
-        "service_config": {"client_json": client_json},  # vẫn giữ để đồng bộ cấu hình
-        "save_credentials": False,
-    })
-    # Quan trọng: truyền dict trực tiếp để tránh json.loads trên dict
-    gauth.ServiceAuth(keyfile_dict=client_json)
+    # Scopes chỉ cần quyền đọc
+    scopes = ["https://www.googleapis.com/auth/drive.readonly"]
+
+    # Không cấu hình service_config nữa; truyền dict trực tiếp cho ServiceAuth
+    gauth = GoogleAuth(settings={"save_credentials": False})
+    gauth.ServiceAuth(keyfile_dict=client_json, scopes=scopes)
+
     return GoogleDrive(gauth)
 
 
@@ -37,7 +41,7 @@ def list_files_in_folder(
     mime_filters: List[str] | None = None,
     include_shared: bool = True,
 ) -> List[Dict[str, Any]]:
-    """Liệt kê file trong folder Drive."""
+    """Liệt kê file trong folder Drive (mặc định PDF + PPTX)."""
     if mime_filters is None:
         mime_filters = [
             "application/pdf",
@@ -65,7 +69,7 @@ def list_files_in_folder(
 
 
 def download_file(drive: GoogleDrive, file_id: str, local_path: str) -> str:
-    """Tải một file từ Drive về local_path."""
+    """Tải file từ Drive về local_path."""
     f = drive.CreateFile({"id": file_id})
     f.GetContentFile(local_path)
     return local_path
