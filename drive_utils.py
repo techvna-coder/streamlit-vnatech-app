@@ -1,75 +1,157 @@
-# drive_utils.py
-from __future__ import annotations
-
+import streamlit as st
 import json
-from typing import Any, Dict, List
-from collections.abc import Mapping
-
-from pydrive2.auth import GoogleAuth
+from pydrive2.auth import ServiceAuth
 from pydrive2.drive import GoogleDrive
+from typing import List, Dict, Any
+from io import BytesIO
 
+def authenticate_drive() -> GoogleDrive:
+    """Authenticate with Google Drive using service account credentials."""
+    try:
+        # Get service account JSON from secrets
+        service_account_json = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
+        
+        # Parse JSON string to dict
+        if isinstance(service_account_json, str):
+            service_account_dict = json.loads(service_account_json)
+        else:
+            service_account_dict = service_account_json
+        
+        # Fix private key newlines if necessary
+        if 'private_key' in service_account_dict:
+            service_account_dict['private_key'] = service_account_dict['private_key'].replace('\\n', '\n')
+        
+        # Authenticate using service account
+        auth = ServiceAuth(keyfile_dict=service_account_dict)
+        auth.authenticate()
+        
+        # Create GoogleDrive instance
+        drive = GoogleDrive(auth)
+        
+        return drive
+        
+    except Exception as e:
+        raise Exception(f"Failed to authenticate with Google Drive: {str(e)}")
 
-def _normalize_gsa(raw: Any) -> Dict[str, Any]:
-    """Chuẩn hoá GOOGLE_SERVICE_ACCOUNT_JSON về dict (hỗ trợ TOML object hoặc JSON string)."""
-    if isinstance(raw, Mapping):
-        return dict(raw)             # TOML object -> dict
-    if isinstance(raw, str):
-        return json.loads(raw)       # JSON string -> dict
-    raise TypeError(f"GOOGLE_SERVICE_ACCOUNT_JSON kiểu không hỗ trợ: {type(raw).__name__}")
+def list_files_in_folder(drive: GoogleDrive, folder_id: str) -> List[Dict[str, Any]]:
+    """List all PDF and PPTX files in a Google Drive folder."""
+    try:
+        # Query for PDF and PPTX files in the specified folder
+        query = f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.presentationml.presentation') and trashed=false"
+        
+        file_list = drive.ListFile({'q': query}).GetList()
+        
+        files = []
+        for file in file_list:
+            files.append({
+                'id': file['id'],
+                'name': file['title'],
+                'mimeType': file['mimeType'],
+                'size': file.get('fileSize', 'Unknown'),
+                'modifiedDate': file.get('modifiedDate', 'Unknown')
+            })
+        
+        # Sort files by name
+        files.sort(key=lambda x: x['name'].lower())
+        
+        return files
+        
+    except Exception as e:
+        raise Exception(f"Failed to list files in folder: {str(e)}")
 
+def download_file(drive: GoogleDrive, file_id: str) -> BytesIO:
+    """Download a file from Google Drive and return as BytesIO object."""
+    try:
+        # Get file metadata
+        file = drive.CreateFile({'id': file_id})
+        
+        # Download file content
+        file_content = BytesIO()
+        file.GetContentIOBuffer(file_content)
+        file_content.seek(0)
+        
+        return file_content
+        
+    except Exception as e:
+        raise Exception(f"Failed to download file {file_id}: {str(e)}")
 
-def get_drive_from_secrets(raw_gsa: Any) -> GoogleDrive:
-    """
-    Tạo GoogleDrive client từ secrets.
-    Dùng ServiceAuth(keyfile_dict=...) + scopes để tránh mọi nhánh parse JSON nội bộ.
-    """
-    client_json = _normalize_gsa(raw_gsa)
-
-    # Scopes chỉ cần quyền đọc
-    scopes = ["https://www.googleapis.com/auth/drive.readonly"]
-
-    # Không cấu hình service_config nữa; truyền dict trực tiếp cho ServiceAuth
-    gauth = GoogleAuth(settings={"save_credentials": False})
-    gauth.ServiceAuth(keyfile_dict=client_json, scopes=scopes)
-
-    return GoogleDrive(gauth)
-
-
-def list_files_in_folder(
-    drive: GoogleDrive,
-    folder_id: str,
-    mime_filters: List[str] | None = None,
-    include_shared: bool = True,
-) -> List[Dict[str, Any]]:
-    """Liệt kê file trong folder Drive (mặc định PDF + PPTX)."""
-    if mime_filters is None:
-        mime_filters = [
-            "application/pdf",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ]
-    mime_q = " or ".join([f"mimeType='{m}'" for m in mime_filters])
-    q = f"'{folder_id}' in parents and trashed=false and ({mime_q})"
-
-    params = {"q": q}
-    if include_shared:
-        params["supportsAllDrives"] = True
-        params["includeItemsFromAllDrives"] = True
-
-    items = drive.ListFile(params).GetList()
-    return [
-        {
-            "id": f["id"],
-            "title": f["title"],
-            "mimeType": f.get("mimeType"),
-            "modifiedDate": f.get("modifiedDate"),
-            "md5Checksum": f.get("md5Checksum"),
+def get_file_metadata(drive: GoogleDrive, file_id: str) -> Dict[str, Any]:
+    """Get metadata for a specific file."""
+    try:
+        file = drive.CreateFile({'id': file_id})
+        file.FetchMetadata()
+        
+        return {
+            'id': file['id'],
+            'name': file['title'],
+            'mimeType': file['mimeType'],
+            'size': file.get('fileSize', 'Unknown'),
+            'modifiedDate': file.get('modifiedDate', 'Unknown'),
+            'createdDate': file.get('createdDate', 'Unknown'),
+            'owners': file.get('owners', []),
+            'lastModifyingUser': file.get('lastModifyingUser', {})
         }
-        for f in items
+        
+    except Exception as e:
+        raise Exception(f"Failed to get metadata for file {file_id}: {str(e)}")
+
+def check_folder_access(drive: GoogleDrive, folder_id: str) -> bool:
+    """Check if the service account has access to the specified folder."""
+    try:
+        folder = drive.CreateFile({'id': folder_id})
+        folder.FetchMetadata(['title', 'mimeType'])
+        
+        # Check if it's actually a folder
+        if folder['mimeType'] != 'application/vnd.google-apps.folder':
+            raise Exception(f"ID {folder_id} is not a folder")
+        
+        return True
+        
+    except Exception as e:
+        raise Exception(f"Cannot access folder {folder_id}: {str(e)}")
+
+# Additional utility functions for better error handling and logging
+
+def validate_service_account_json(service_account_json: str) -> Dict[str, Any]:
+    """Validate and parse service account JSON."""
+    try:
+        if isinstance(service_account_json, str):
+            service_account_dict = json.loads(service_account_json)
+        else:
+            service_account_dict = service_account_json
+        
+        # Check required fields
+        required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
+        for field in required_fields:
+            if field not in service_account_dict:
+                raise ValueError(f"Missing required field: {field}")
+        
+        return service_account_dict
+        
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format: {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Service account validation failed: {str(e)}")
+
+def get_supported_mime_types() -> List[str]:
+    """Return list of supported MIME types."""
+    return [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     ]
 
+def is_supported_file_type(mime_type: str) -> bool:
+    """Check if file type is supported."""
+    return mime_type in get_supported_mime_types()
 
-def download_file(drive: GoogleDrive, file_id: str, local_path: str) -> str:
-    """Tải file từ Drive về local_path."""
-    f = drive.CreateFile({"id": file_id})
-    f.GetContentFile(local_path)
-    return local_path
+def format_file_size(size_bytes: str) -> str:
+    """Format file size in human-readable format."""
+    try:
+        size = int(size_bytes)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} TB"
+    except (ValueError, TypeError):
+        return "Unknown"
